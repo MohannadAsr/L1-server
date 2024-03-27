@@ -5,6 +5,7 @@ const multer = require('multer'); // For handling file uploads
 
 const cors = require('cors');
 const vipsRouter = require('./routes/VipsRouter');
+const ProductsRouter = require('./routes/ProductsRouter');
 const evenstRouter = require('./routes/EventsRouter');
 const usersRouter = require('./routes/usersRouter');
 const invitationsRouter = require('./routes/InvitationsRouter');
@@ -40,6 +41,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/vips', vipsRouter);
+app.use('/api/products', ProductsRouter);
 app.use('/api/events', evenstRouter);
 app.use('/api/invitaions', invitationsRouter);
 app.use('/users', usersRouter);

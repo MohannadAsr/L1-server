@@ -1,8 +1,7 @@
 const { DataTypes } = require('sequelize');
-const { isEmail } = require('validator');
 
 module.exports = (sequelize) => {
-  const Vips = sequelize.define('Vips', {
+  const VipRequest = sequelize.define('VipRequest', {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -26,5 +25,5 @@ module.exports = (sequelize) => {
     },
   });
 
-  return Vips;
+  return VipRequest;
 };

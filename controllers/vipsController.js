@@ -1,8 +1,9 @@
 const catchAsync = require('../utils/catchAsync');
-const { Vips, Users } = require('../models');
+const { Vips, Users, VipRequest } = require('../models');
 const Pagination = require('../utils/Pagination');
 const AppError = require('../utils/appError');
 const jwt = require('jsonwebtoken');
+const getPaginatedResults = require('../utils/Pagination');
 
 exports.getaccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -11,29 +12,41 @@ exports.getaccessToken = (id) => {
 };
 
 exports.getAllVips = catchAsync(async (req, res, next) => {
-  const PaginationInstance = new Pagination(
-    parseInt(req.query.pageIndex) || 1,
-    parseInt(req.query.pageSize) || 10
-  );
+  const { List, pagination } = await getPaginatedResults(req, Vips);
+  const allVipRequests = await VipRequest.findAll();
 
-  const count = await Vips.count();
-  const AllVips = await Vips.findAll({
-    order: [['updatedAt', 'DESC']],
-    offset: PaginationInstance.offset(),
-    limit: PaginationInstance.pageSize,
-  });
-
-  const pagination = {
-    ...PaginationInstance,
-    totalPages: PaginationInstance.totalPages(count),
-    totalCount: count,
-  };
-
-  res.status(200).json({ message: 'success', data: AllVips, pagination });
+  res
+    .status(200)
+    .json({ message: 'success', data: List, allVipRequests, pagination });
 });
 
 exports.createVip = catchAsync(async (req, res, next) => {
-  const newVip = await Vips.create(req.body);
+  const { email, phone } = req.body;
+
+  const checkDuplicateEmail = await Vips.findOne({
+    where: {
+      email: email,
+    },
+  });
+  const checkDuplicatePhone = await Vips.findOne({
+    where: {
+      phone: phone,
+    },
+  });
+
+  if (!email && !phone) {
+    return next(new AppError('Please Provide Email or phone number'));
+  }
+
+  if (checkDuplicateEmail && email) {
+    return next(new AppError('Duplicated Email  Vip Already exist'));
+  }
+  if (checkDuplicatePhone && phone) {
+    console.log(checkDuplicatePhone);
+    return next(new AppError('Duplicated Phone Vip Already exist'));
+  }
+
+  const newVip = await Vips.upsert(req.body);
   res.status(200).json({ message: 'success', data: newVip });
 });
 
@@ -93,7 +106,7 @@ exports.vipLogin = catchAsync(async (req, res, next) => {
   }
 
   if (!user) {
-    return next(new AppError('Incorrect email or phone number', 400));
+    return next(new AppError('Incorrect email or phone number', 404));
   }
 
   // Generate and send the JWT token
@@ -108,4 +121,85 @@ exports.vipLogin = catchAsync(async (req, res, next) => {
       token,
     },
   });
+});
+
+exports.VipRequest = catchAsync(async (req, res, next) => {
+  const { email, phone } = req.body;
+
+  const checkDuplicateEmail = await Vips.findOne({
+    where: {
+      email: email,
+    },
+  });
+  const checkDuplicatePhone = await Vips.findOne({
+    where: {
+      phone: phone,
+    },
+  });
+  const checkDuplicateEmailReq = await VipRequest.findOne({
+    where: {
+      email: email,
+    },
+  });
+  const checkDuplicatePhoneReq = await VipRequest.findOne({
+    where: {
+      phone: phone,
+    },
+  });
+
+  if (!email && !phone) {
+    return next(new AppError('Please Provide Email or phone number'));
+  }
+
+  if (checkDuplicateEmail && email) {
+    return next(new AppError('Already in Vip List'));
+  }
+  if (checkDuplicatePhone && phone) {
+    console.log(checkDuplicatePhone);
+    return next(new AppError('Already in Vip List'));
+  }
+  if (checkDuplicateEmailReq && email) {
+    return next(new AppError('Already Requested to join . '));
+  }
+  if (checkDuplicatePhoneReq && phone) {
+    console.log(checkDuplicatePhone);
+    return next(new AppError('Already Requested to join . '));
+  }
+
+  const newVip = await VipRequest.create(req.body);
+  res.status(200).json({ message: 'success', data: newVip });
+});
+
+exports.AcceptVipRequest = catchAsync(async (req, res, next) => {
+  const targetRequest = await VipRequest.findOne({
+    where: {
+      id: req.params.id,
+    },
+  });
+  if (!targetRequest) return next(new AppError('No Request with that Id', 404));
+  console.log(targetRequest.name);
+  const newVip = await Vips.upsert({
+    name: targetRequest.name,
+    email: targetRequest.email,
+    phone: targetRequest.phone,
+  });
+  if (newVip) {
+    await VipRequest.destroy({
+      where: {
+        id: req.params.id,
+      },
+    });
+  }
+  res.status(200).json({
+    message: 'done',
+  });
+});
+
+exports.rejectVipRequest = catchAsync(async (req, res, next) => {
+  const deleteTarget = await VipRequest.destroy({
+    where: {
+      id: req.params.id,
+    },
+  });
+  res.status(200).json({ message: 'done' });
 });

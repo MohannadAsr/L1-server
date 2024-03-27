@@ -15,5 +15,9 @@ router
   .route('/update')
   .post(usersController.protectRoute, vipsController.updateVip);
 
+router.route('/joinRequest').post(vipsController.VipRequest);
+router.route('/acceptRequest/:id').post(vipsController.AcceptVipRequest);
+router.route('/rejectRequest/:id').post(vipsController.rejectVipRequest);
+
 router.route('/login').post(vipsController.vipLogin);
 module.exports = router;

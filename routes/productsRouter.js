@@ -1,29 +1,14 @@
 const express = require('express');
 
 const router = express.Router();
-const productController = require('../controllers/productsController');
-const usersController = require('../controllers/usersController');
+const productsController = require('../controllers/productsController');
 
 router
   .route('/')
-  .get(productController.getAllProducts)
-  .post(
-    usersController.protectRoute,
-    usersController.restrictTo('admin'),
-    productController.createProduct
-  )
-  .delete(
-    usersController.protectRoute,
-    usersController.restrictTo('admin'),
-    productController.deleteProducts
-  );
+  .get(productsController.getAllProducts)
+  .post(productsController.createProduct)
+  .delete(productsController.deleteProducts);
 
-router
-  .route('/updateproduct')
-  .post(
-    usersController.protectRoute,
-    usersController.restrictTo('admin'),
-    productController.updateProduct
-  );
+router.route('/switchStatus/:id').post(productsController.switchProductStatus);
 
 module.exports = router;

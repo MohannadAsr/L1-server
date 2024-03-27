@@ -35,6 +35,10 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true,
     },
+    deliveryAddress: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   });
 
   return InviteOptions;

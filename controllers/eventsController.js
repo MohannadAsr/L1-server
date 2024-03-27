@@ -1,5 +1,5 @@
 const catchAsync = require('../utils/catchAsync');
-const { Events, Vips, Invitations } = require('../models');
+const { Events, Vips, Invitations, Products } = require('../models');
 const { deleteImage, deleteQr } = require('./ImagesController');
 const { Op } = require('sequelize');
 const AppError = require('../utils/appError');
@@ -92,6 +92,7 @@ exports.getHomeInfos = catchAsync(async (req, res, next) => {
   const totalEvents = await Events.count();
   const totalVipsCount = await Vips.count();
   const totalInvitaions = await Invitations.count();
+  const totalProducts = await Products.count();
 
   res.status(200).json({
     message: 'success',
@@ -100,6 +101,7 @@ exports.getHomeInfos = catchAsync(async (req, res, next) => {
       totalVips: totalVipsCount,
       totalEvents,
       totalInvitaions,
+      totalProducts,
     },
   });
 });
