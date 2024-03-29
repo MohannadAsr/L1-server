@@ -30,12 +30,58 @@ module.exports = (sequelize) => {
     },
     status: {
       type: DataTypes.ENUM('approved', 'completed', 'missed'),
-      defaultValue: 'pending',
+      defaultValue: 'approved',
       allowNull: false,
     },
-    optionsId: {
-      type: DataTypes.UUID,
+    peopleCount: {
+      type: DataTypes.INTEGER, // Change to INTEGER
       allowNull: true,
+    },
+    peopleNames: {
+      type: DataTypes.JSON, // Defines an array of integers
+      allowNull: true,
+      get() {
+        // Parse the stored JSON string when fetching the value
+        const rawValue = this.getDataValue('peopleNames');
+        return rawValue ? JSON.parse(rawValue) : null;
+      },
+      set(value) {
+        // Stringify the JSON object when setting the value
+        this.setDataValue('peopleNames', value ? JSON.stringify(value) : null);
+      },
+    },
+    tableReservation: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+    },
+    deliveryOption: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+    },
+    deliveryDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    deliveryAddress: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    completedDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    products: {
+      type: DataTypes.JSON, // Defines an array of integers
+      allowNull: true,
+      get() {
+        // Parse the stored JSON string when fetching the value
+        const rawValue = this.getDataValue('products');
+        return rawValue ? JSON.parse(rawValue) : null;
+      },
+      set(value) {
+        // Stringify the JSON object when setting the value
+        this.setDataValue('products', value ? JSON.stringify(value) : null);
+      },
     },
   });
 

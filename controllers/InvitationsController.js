@@ -1,7 +1,11 @@
-const { Invitations, Events, Vips, QrCodes } = require('../models');
+const { Invitations, Events, Vips, QrCodes, Products } = require('../models');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 
+const sharp = require('sharp');
+const qr = require('qrcode');
+
+// Create Approved Invitaion
 exports.createInvitaion = catchAsync(async (req, res, next) => {
   const checkEvent = await Events.findByPk(req.body.eventId);
   const checkVip = await Vips.findByPk(req.body.vipId);
@@ -26,9 +30,61 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
 
   const newInvitation = await Invitations.create(req.body);
 
-  res.status(200).json({ message: 'success', data: newInvitation });
+  // Url for database to use it
+  const url = `${req.protocol}://${req.get('host')}/images/${
+    newInvitation.id
+  }.png`;
+
+  // Create New Qr for This Invitation
+  const newQrCode = await QrCodes.create({
+    qrUrl: url,
+    invitationId: newInvitation.id,
+  });
+
+  // set the Qr Url that send me to qrInvitationPage
+  const urlScan = `${newInvitation.id}`;
+
+  // Generate QR code as a data URL
+  const qrCodeDataURL = await qr.toDataURL(urlScan, {
+    width: 500,
+    height: 500,
+  });
+
+  // Create a buffer from the data URL
+  const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
+
+  // Create a sharp object from the buffer
+  const sharpImage = sharp(qrCodeBuffer);
+
+  // Save the image to a file (e.g., public/images/qrcode.png)
+  const imagePath = `public/images/${newInvitation.id}.png`;
+
+  await sharpImage.toFile(imagePath);
+
+  const updatedInvitation = await Invitations.update(
+    { status: 'approved', qrCodeId: newQrCode.id, qrCodeUrl: url },
+    {
+      where: { id: newInvitation.id },
+      returning: true, // This ensures that the updated record is returned
+    }
+  );
+
+  if (req.body.tableReservation == true) {
+    console.log('yseees', checkEvent.tablesCount - 1);
+    await Events.update(
+      { tablesCount: checkEvent.tablesCount - 1 },
+      {
+        where: {
+          id: checkEvent.id,
+        },
+      }
+    );
+  }
+
+  res.status(200).json({ message: 'success', data: updatedInvitation });
 });
 
+// INvitaions By Event
 exports.getInviationsByEvent = catchAsync(async (req, res, next) => {
   const Allinvitations = await Invitations.findAll({
     where: { eventId: req.params.id },
@@ -61,6 +117,8 @@ exports.getInviationsByEvent = catchAsync(async (req, res, next) => {
   });
 });
 
+// Get Invitaion
+
 exports.getInvitation = catchAsync(async (req, res, next) => {
   const invitation = await Invitations.findByPk(req.params.id);
 
@@ -69,6 +127,20 @@ exports.getInvitation = catchAsync(async (req, res, next) => {
   }
   const event = await Events.findByPk(invitation.eventId);
   const vip = await Vips.findByPk(invitation.vipId);
+
+  let productList;
+  if (invitation?.products?.length > 0) {
+    productList = await Promise.all(
+      invitation.products.map(async (item) => {
+        const product = await Products.findOne({
+          where: {
+            id: item.id,
+          },
+        });
+        return { ...item, product: product };
+      })
+    );
+  }
 
   if (!event || !vip) {
     return next(new AppError('Event or Vip Not Exist', 404));
@@ -80,10 +152,12 @@ exports.getInvitation = catchAsync(async (req, res, next) => {
       invitation,
       event,
       vip,
+      productList: productList || [],
     },
   });
 });
 
+// Get Invitaion for vips
 exports.getInvitaionByEventandUserIds = catchAsync(async (req, res, next) => {
   const invitation = await Invitations.findOne({
     where: { eventId: req.query.eventId, vipId: req.query.vipId },
@@ -96,13 +170,14 @@ exports.getInvitaionByEventandUserIds = catchAsync(async (req, res, next) => {
   res.status(200).json({ message: 'success', data: invitation });
 });
 
+// update Invitaion Status
 exports.updateInvitationStatus = catchAsync(async (req, res, next) => {
   const invitationId = req.body.id; // Assuming the invitation ID is passed in the request params
   const newStatus = req.body.status; // Assuming the new status is passed in the request body
 
   // Update the invitation status
   const updatedInvitation = await Invitations.update(
-    { status: newStatus },
+    { status: newStatus, completedDate: new Date() },
     {
       where: { id: invitationId },
       returning: true, // This ensures that the updated record is returned
@@ -123,72 +198,69 @@ exports.updateInvitationStatus = catchAsync(async (req, res, next) => {
   res.status(200).json({ message: 'Success', data: updatedInvitationRecord });
 });
 
-const sharp = require('sharp');
-const qr = require('qrcode');
+// exports.approveInvitaion = catchAsync(async (req, res, nex) => {
+//   const { id } = req.body;
 
-exports.approveInvitaion = catchAsync(async (req, res, nex) => {
-  const { id } = req.body;
+//   const targetInvitiation = await Invitations.findByPk(id);
 
-  const targetInvitiation = await Invitations.findByPk(id);
+//   if (!targetInvitiation) {
+//     return next('Unable to Find this Invitation', 404);
+//   }
 
-  if (!targetInvitiation) {
-    return next('Unable to Find this Invitation', 404);
-  }
+//   // Url for database to use it
+//   const url = `${req.protocol}://${req.get('host')}/images/${req?.body.id}.png`;
 
-  // Url for database to use it
-  const url = `${req.protocol}://${req.get('host')}/images/${req?.body.id}.png`;
+//   // Create New Qr for This Invitation
+//   const newQrCode = await QrCodes.create({
+//     qrUrl: url,
+//     invitationId: id,
+//   });
 
-  // Create New Qr for This Invitation
-  const newQrCode = await QrCodes.create({
-    qrUrl: url,
-    invitationId: id,
-  });
+//   // set the Qr Url that send me to qrInvitationPage
+//   const urlScan = `${id}`;
 
-  // set the Qr Url that send me to qrInvitationPage
-  const urlScan = `${id}`;
+//   // Generate QR code as a data URL
+//   const qrCodeDataURL = await qr.toDataURL(urlScan, {
+//     width: 500,
+//     height: 500,
+//   });
 
-  // Generate QR code as a data URL
-  const qrCodeDataURL = await qr.toDataURL(urlScan, {
-    width: 500,
-    height: 500,
-  });
+//   // Create a buffer from the data URL
+//   const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
 
-  // Create a buffer from the data URL
-  const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
+//   // Create a sharp object from the buffer
+//   const sharpImage = sharp(qrCodeBuffer);
 
-  // Create a sharp object from the buffer
-  const sharpImage = sharp(qrCodeBuffer);
+//   // Save the image to a file (e.g., public/images/qrcode.png)
+//   const imagePath = `public/images/${id}.png`;
 
-  // Save the image to a file (e.g., public/images/qrcode.png)
-  const imagePath = `public/images/${id}.png`;
+//   await sharpImage.toFile(imagePath);
 
-  await sharpImage.toFile(imagePath);
+//   const updatedInvitation = await Invitations.update(
+//     { status: 'approved', qrCodeId: newQrCode.id, qrCodeUrl: url },
+//     {
+//       where: { id: id },
+//       returning: true, // This ensures that the updated record is returned
+//     }
+//   );
 
-  const updatedInvitation = await Invitations.update(
-    { status: 'approved', qrCodeId: newQrCode.id, qrCodeUrl: url },
-    {
-      where: { id: id },
-      returning: true, // This ensures that the updated record is returned
-    }
-  );
+//   res
+//     .status(200)
+//     .json({ message: 'done', updatedInvite: updatedInvitation[1][0] });
+// });
 
-  res
-    .status(200)
-    .json({ message: 'done', updatedInvite: updatedInvitation[1][0] });
-});
+// exports.rejectInvitaion = catchAsync(async (req, res, next) => {
+//   const { id } = req.body;
 
-exports.rejectInvitaion = catchAsync(async (req, res, next) => {
-  const { id } = req.body;
+//   const updatedInvitation = await Invitations.update(
+//     { status: 'rejected' },
+//     {
+//       where: { id: id },
+//       returning: true, // This ensures that the updated record is returned
+//     }
+//   );
 
-  const updatedInvitation = await Invitations.update(
-    { status: 'rejected' },
-    {
-      where: { id: id },
-      returning: true, // This ensures that the updated record is returned
-    }
-  );
-
-  res
-    .status(200)
-    .json({ message: 'done', updatedInvite: updatedInvitation[1][0] });
-});
+//   res
+//     .status(200)
+//     .json({ message: 'done', updatedInvite: updatedInvitation[1][0] });
+// });

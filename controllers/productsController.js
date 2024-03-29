@@ -5,6 +5,16 @@ const { Transactions } = require('../models');
 const Pagination = require('../utils/Pagination');
 const getPaginatedResults = require('../utils/Pagination');
 
+exports.getProuctsList = catchAsync(async (req, res) => {
+  const ProductsList = await Products.findAll({
+    where: {
+      active: true,
+    },
+  });
+
+  res.json({ status: 200, data: ProductsList });
+});
+
 exports.getAllProducts = catchAsync(async (req, res) => {
   const { List, pagination } = await getPaginatedResults(req, Products);
 

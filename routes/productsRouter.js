@@ -8,7 +8,7 @@ router
   .get(productsController.getAllProducts)
   .post(productsController.createProduct)
   .delete(productsController.deleteProducts);
-
+router.route('/productsList').get(productsController.getProuctsList);
 router.route('/switchStatus/:id').post(productsController.switchProductStatus);
 
 module.exports = router;
