@@ -219,39 +219,42 @@ exports.stripeWebHook = async (req, res) => {
   // Handle the event
   switch (event.type) {
     case 'checkout.session.completed':
-      const sessionComplete = event.data.object;
+      try {
+        const sessionComplete = event.data.object;
 
-      const newInvitation = await Invitations.findOne({
-        where: {
-          id: sessionComplete.metadata.inviteId,
-        },
-      });
-      // const checkEvent = await Events.findByPk(newInvitation.eventId);
+        const newInvitation = await Invitations.findOne({
+          where: {
+            id: sessionComplete.metadata.inviteId,
+          },
+        });
+        // const checkEvent = await Events.findByPk(newInvitation.eventId);
 
-      // Generating the Qr Code
-      const { newQrCode, url } = await this.createQrCode(req, newInvitation);
+        // Generating the Qr Code
+        const { newQrCode, url } = await this.createQrCode(req, newInvitation);
 
-      const payment = await Bills.create({
-        invitationId: newInvitation.id,
-        eventId: newInvitation.eventId,
-        vipId: newInvitation.vipId,
-        date: new Date(),
-        billDetails: sessionComplete,
-      });
-      await Invitations.update(
-        {
-          status: 'approved',
-          qrCodeId: newQrCode.id,
-          qrCodeUrl: url,
-          paid: true,
-          paymentId: payment.id,
-        },
-        {
-          where: { id: newInvitation.id },
-          returning: true, // This ensures that the updated record is returned
-        }
-      );
-
+        const payment = await Bills.create({
+          invitationId: newInvitation.id,
+          eventId: newInvitation.eventId,
+          vipId: newInvitation.vipId,
+          date: new Date(),
+          billDetails: sessionComplete,
+        });
+        await Invitations.update(
+          {
+            status: 'approved',
+            qrCodeId: newQrCode.id,
+            qrCodeUrl: url,
+            paid: true,
+            paymentId: payment.id,
+          },
+          {
+            where: { id: newInvitation.id },
+            returning: true, // This ensures that the updated record is returned
+          }
+        );
+      } catch (error) {
+        res.status(400).send(`Webhook Error: ${error}`);
+      }
       // Then define and call a function to handle the event payment_intent.succeeded
       break;
 
