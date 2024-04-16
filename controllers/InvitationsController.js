@@ -383,6 +383,7 @@ exports.updateInvitationStatus = catchAsync(async (req, res, next) => {
   res.status(200).json({ message: 'Success', data: updatedInvitationRecord });
 });
 
+// Force Delete Invitation To Avoid Stats affect
 exports.deleteInvitation = catchAsync(async (req, res, next) => {
   const { id } = req.query;
 
