@@ -200,7 +200,9 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
   res.status(200).json({ message: 'success', data: updatedInvitation });
 });
 
-const endpointSecret = process.env.STRIPE_SECRET;
+const endpointSecret =
+  process.env.STRIPE_SECRET ||
+  'whsec_5035bd176b4cf5edf614db0fa9815db24861208c58ca667a96a9d35281449703';
 
 exports.stripeWebHook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -210,7 +212,7 @@ exports.stripeWebHook = async (req, res) => {
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
   } catch (err) {
-    response.status(400).send(`Webhook Error: ${err.message}`);
+    res.status(400).send(`Webhook Error: ${err.message}`);
     return;
   }
 
