@@ -105,8 +105,8 @@ exports.createStripeSession = async (
         };
       }),
       mode: 'payment',
-      success_url: `http://localhost:3000/eventaccess/${checkEvent.id}`,
-      cancel_url: `http://localhost:3000/eventaccess/${checkEvent.id}`,
+      success_url: `https://qr-test-iw1o.vercel.app/eventaccess/${checkEvent.id}`,
+      cancel_url: `https://qr-test-iw1o.vercel.app/eventaccess/${checkEvent.id}`,
       metadata: additionalData, // Incl
     });
 
