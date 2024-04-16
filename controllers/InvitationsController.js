@@ -152,7 +152,8 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
     );
   }
 
-  const withProducts = req?.body?.products ? true : false;
+  const withProducts =
+    req?.body?.products && req?.body?.products?.length > 0 ? true : false;
 
   const newInvitation = await Invitations.create({
     ...req.body,
@@ -200,9 +201,7 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
   res.status(200).json({ message: 'success', data: updatedInvitation });
 });
 
-const endpointSecret =
-  process.env.STRIPE_SECRET ||
-  'whsec_5035bd176b4cf5edf614db0fa9815db24861208c58ca667a96a9d35281449703';
+const endpointSecret = 'whsec_UUE7SLbIIbf8wsCOgBKNZTR6ffC44B9O';
 
 exports.stripeWebHook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -391,6 +390,7 @@ exports.deleteInvitation = catchAsync(async (req, res, next) => {
     where: {
       id: id,
     },
+    force: true,
   });
 
   res.status(204).json({ message: 'done' });
