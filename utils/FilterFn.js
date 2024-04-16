@@ -1,4 +1,3 @@
-const { Op } = require('sequelize');
 
 const FilterFn = (filterOptions) => {
   const whereClause = {};

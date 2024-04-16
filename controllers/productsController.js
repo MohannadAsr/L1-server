@@ -3,7 +3,6 @@ const catchAsync = require('../utils/catchAsync');
 const { Products } = require('../models');
 const { Transactions } = require('../models');
 const Pagination = require('../utils/Pagination');
-const getPaginatedResults = require('../utils/Pagination');
 
 exports.getProuctsList = catchAsync(async (req, res) => {
   const ProductsList = await Products.findAll({
@@ -16,7 +15,10 @@ exports.getProuctsList = catchAsync(async (req, res) => {
 });
 
 exports.getAllProducts = catchAsync(async (req, res) => {
-  const { List, pagination } = await getPaginatedResults(req, Products);
+  const { List, pagination } = await Pagination.getPaginatedResults(
+    req,
+    Products
+  );
 
   res.json({ status: 200, data: List, pagination });
 });

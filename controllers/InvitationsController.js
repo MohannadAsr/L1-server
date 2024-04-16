@@ -1,20 +1,142 @@
-const { Invitations, Events, Vips, QrCodes, Products } = require('../models');
+const {
+  Invitations,
+  Events,
+  Vips,
+  QrCodes,
+  Products,
+  Bills,
+  Tables,
+} = require('../models');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
-
+const stripe = require('stripe')(
+  'sk_test_51P2CZO058qqSIt9U4RSCEC66KMYzMUVtnkOzycZl39t93FMmB6Jb5XjtqH8DOqd1wVS72PRL5uADQsKL7vKCPfNB00vsZvcyGD'
+);
 const sharp = require('sharp');
 const qr = require('qrcode');
+const WhereClauseFilter = require('../utils/WhereClauseFilter');
+const { Pagination } = require('../utils/Pagination');
+const { Op } = require('sequelize');
+
+exports.createQrCode = async (req, newInvitation) => {
+  try {
+    // Generating the Qr Code
+
+    // Url for database to use it
+    const url = `${req.protocol}://${req.get('host')}/images/${
+      newInvitation.id
+    }.png`;
+
+    // Create New Qr for This Invitation
+    const newQrCode = await QrCodes.create({
+      qrUrl: url,
+      invitationId: newInvitation.id,
+    });
+
+    // set the Qr Url that send me to qrInvitationPage
+    const urlScan = `${newInvitation.id}`;
+
+    // Generate QR code as a data URL
+    const qrCodeDataURL = await qr.toDataURL(urlScan, {
+      width: 500,
+      height: 500,
+    });
+
+    // Create a buffer from the data URL
+    const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
+
+    // Create a sharp object from the buffer
+    const sharpImage = sharp(qrCodeBuffer);
+
+    // Save the image to a file (e.g., public/images/qrcode.png)
+    const imagePath = `public/images/${newInvitation.id}.png`;
+
+    await sharpImage.toFile(imagePath);
+
+    return { newQrCode, url };
+  } catch (error) {
+    throw new AppError('Cannot Create Qr Code', 400);
+  }
+};
+
+// Function to remove unpaid invitations after 10 minutes
+const removeUnpaidInvitations = async (invitationId) => {
+  try {
+    // Wait for 10 minutes
+    await new Promise((resolve) => setTimeout(resolve, 60 * 10 * 1000));
+
+    // Find the invitation by ID
+    const invitation = await Invitations.findByPk(invitationId);
+
+    // If invitation is still unpaid, remove it
+    if (invitation && !invitation.paid) {
+      await Invitations.destroy({
+        where: {
+          id: invitation.id,
+        },
+      });
+      console.log(`Removed unpaid invitation with ID ${invitationId}.`);
+    }
+  } catch (error) {
+    console.error('Error removing unpaid invitation:', error);
+  }
+};
+
+exports.createStripeSession = async (
+  checkEvent,
+  newInvitation,
+  additionalData
+) => {
+  try {
+    // Create a Checkout Session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+
+      line_items: newInvitation.products.map((item) => {
+        return {
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: `${item.name}`,
+            },
+            unit_amount: Number(item.price) * 100,
+          },
+          quantity: item.quantity,
+        };
+      }),
+      mode: 'payment',
+      success_url: `http://localhost:3000/eventaccess/${checkEvent.id}`,
+      cancel_url: `http://localhost:3000/eventaccess/${checkEvent.id}`,
+      metadata: additionalData, // Incl
+    });
+
+    // Schedule removal of unpaid invitation after 10 minutes
+    const invitationId = newInvitation.id;
+    removeUnpaidInvitations(invitationId);
+
+    return { session };
+  } catch (error) {
+    throw error;
+  }
+};
 
 // Create Approved Invitaion
 exports.createInvitaion = catchAsync(async (req, res, next) => {
   const checkEvent = await Events.findByPk(req.body.eventId);
   const checkVip = await Vips.findByPk(req.body.vipId);
 
+  // Check Validate Informations
   if (!req.body.eventId || !checkEvent) {
     return next(new AppError('Event Not exist', 404));
   }
   if (!req.body.vipId || !checkVip) {
     return next(new AppError('Unable to recognize the customer', 404));
+  }
+
+  if (req.body.tableReservation == true) {
+    if (checkEvent.tablesCount - 1 < 0) {
+      return next(new AppError('Sorry No Tables Available', 400));
+    }
   }
 
   const checkDuplicatedInvitaion = await Invitations.findOne({
@@ -25,41 +147,47 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
   });
 
   if (checkDuplicatedInvitaion) {
-    next(new AppError('User Already Have Invitaion for this Event', 400));
+    return next(
+      new AppError('User Already Have Invitaion for this Event', 400)
+    );
   }
 
-  const newInvitation = await Invitations.create(req.body);
+  const withProducts = req?.body?.products ? true : false;
 
-  // Url for database to use it
-  const url = `${req.protocol}://${req.get('host')}/images/${
-    newInvitation.id
-  }.png`;
-
-  // Create New Qr for This Invitation
-  const newQrCode = await QrCodes.create({
-    qrUrl: url,
-    invitationId: newInvitation.id,
+  const newInvitation = await Invitations.create({
+    ...req.body,
+    paid: withProducts ? false : true,
+    status: withProducts ? 'pending' : 'approved',
   });
 
-  // set the Qr Url that send me to qrInvitationPage
-  const urlScan = `${newInvitation.id}`;
+  /// if have Product Create Session for him
+  if (withProducts) {
+    const additionalData = {
+      inviteId: newInvitation.id,
+    };
 
-  // Generate QR code as a data URL
-  const qrCodeDataURL = await qr.toDataURL(urlScan, {
-    width: 500,
-    height: 500,
-  });
+    const { session } = await this.createStripeSession(
+      checkEvent,
+      newInvitation,
+      additionalData
+    );
 
-  // Create a buffer from the data URL
-  const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
+    // Add the Payment Link to Pending One
+    await Invitations.update(
+      { ...newInvitation, paymentUrl: session.url },
+      {
+        where: {
+          id: newInvitation.id,
+        },
+      }
+    );
 
-  // Create a sharp object from the buffer
-  const sharpImage = sharp(qrCodeBuffer);
+    res.json({ data: session });
+    return;
+  }
 
-  // Save the image to a file (e.g., public/images/qrcode.png)
-  const imagePath = `public/images/${newInvitation.id}.png`;
-
-  await sharpImage.toFile(imagePath);
+  // Create QrCode
+  const { newQrCode, url } = await this.createQrCode(req, newInvitation);
 
   const updatedInvitation = await Invitations.update(
     { status: 'approved', qrCodeId: newQrCode.id, qrCodeUrl: url },
@@ -69,78 +197,132 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
     }
   );
 
-  if (req.body.tableReservation == true) {
-    console.log('yseees', checkEvent.tablesCount - 1);
-    await Events.update(
-      { tablesCount: checkEvent.tablesCount - 1 },
-      {
-        where: {
-          id: checkEvent.id,
-        },
-      }
-    );
-  }
-
   res.status(200).json({ message: 'success', data: updatedInvitation });
 });
 
+const endpointSecret = process.env.STRIPE_SECRET;
+
+exports.stripeWebHook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    response.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const sessionComplete = event.data.object;
+
+      const newInvitation = await Invitations.findOne({
+        where: {
+          id: sessionComplete.metadata.inviteId,
+        },
+      });
+      // const checkEvent = await Events.findByPk(newInvitation.eventId);
+
+      // Generating the Qr Code
+      const { newQrCode, url } = await this.createQrCode(req, newInvitation);
+
+      const payment = await Bills.create({
+        invitationId: newInvitation.id,
+        eventId: newInvitation.eventId,
+        vipId: newInvitation.vipId,
+        date: new Date(),
+        billDetails: sessionComplete,
+      });
+      await Invitations.update(
+        {
+          status: 'approved',
+          qrCodeId: newQrCode.id,
+          qrCodeUrl: url,
+          paid: true,
+          paymentId: payment.id,
+        },
+        {
+          where: { id: newInvitation.id },
+          returning: true, // This ensures that the updated record is returned
+        }
+      );
+
+      // Then define and call a function to handle the event payment_intent.succeeded
+      break;
+
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+};
+
 // INvitaions By Event
 exports.getInviationsByEvent = catchAsync(async (req, res, next) => {
+  const { status, name, deliveryOption } = req.query;
+  const PaginationInstance = new Pagination(
+    parseInt(req.query.pageIndex) || 1,
+    parseInt(req.query.pageSize) || 10
+  );
+
+  const filter = [
+    { key: 'status', value: status, whereValue: status },
+    {
+      key: 'deliveryOption',
+      value: deliveryOption,
+      whereValue: { [Op.eq]: deliveryOption },
+    },
+    { key: '$vip.name$', value: name, whereValue: { [Op.like]: `%${name}%` } },
+  ];
+
+  const count = await Invitations.count({
+    where: {
+      eventId: req.params.id,
+    },
+  });
   const Allinvitations = await Invitations.findAll({
-    where: { eventId: req.params.id },
+    offset: PaginationInstance.offset(),
+    limit: PaginationInstance.pageSize,
+    where: {
+      eventId: req.params.id,
+      ...WhereClauseFilter(filter),
+    },
+    include: {
+      model: Vips,
+      as: 'vip',
+      attributes: ['name', 'email', 'phone', 'id'], // Specify attributes you want to include
+    },
   });
 
-  const AllInvitaionDetails = await Promise.all(
-    Allinvitations.map(async (item) => {
-      const vip = await Vips.findByPk(item.vipId);
-      const event = await Events.findByPk(item.eventId); // Assuming your event model is named "Events"
-
-      // Include event details in the invitation object
-      return {
-        id: item.id,
-        event: event,
-        vip: vip,
-        qrCodeId: item.qrCodeId,
-        qrCodeUrl: item.qrCodeUrl,
-        status: item.status,
-        optionsId: item.optionsId,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      };
-    })
-  );
+  const pagination = {
+    ...PaginationInstance,
+    totalPages: PaginationInstance.totalPages(count),
+    totalCount: count,
+  };
 
   res.status(200).json({
     message: 'success',
-    data: AllInvitaionDetails,
-    totalCount: AllInvitaionDetails.length,
+    data: Allinvitations,
+    pagination,
   });
 });
 
 // Get Invitaion
 
 exports.getInvitation = catchAsync(async (req, res, next) => {
-  const invitation = await Invitations.findByPk(req.params.id);
+  const invitation = await Invitations.findByPk(req.params.id, {
+    include: {
+      model: Tables,
+      as: 'table',
+    },
+  });
 
   if (!invitation) {
     return next(new AppError('Invitation Not Exist', 404));
   }
   const event = await Events.findByPk(invitation.eventId);
   const vip = await Vips.findByPk(invitation.vipId);
-
-  let productList;
-  if (invitation?.products?.length > 0) {
-    productList = await Promise.all(
-      invitation.products.map(async (item) => {
-        const product = await Products.findOne({
-          where: {
-            id: item.id,
-          },
-        });
-        return { ...item, product: product };
-      })
-    );
-  }
 
   if (!event || !vip) {
     return next(new AppError('Event or Vip Not Exist', 404));
@@ -152,7 +334,6 @@ exports.getInvitation = catchAsync(async (req, res, next) => {
       invitation,
       event,
       vip,
-      productList: productList || [],
     },
   });
 });
@@ -196,6 +377,18 @@ exports.updateInvitationStatus = catchAsync(async (req, res, next) => {
   const updatedInvitationRecord = updatedInvitation[1][0];
 
   res.status(200).json({ message: 'Success', data: updatedInvitationRecord });
+});
+
+exports.deleteInvitation = catchAsync(async (req, res, next) => {
+  const { id } = req.query;
+
+  await Invitations.destroy({
+    where: {
+      id: id,
+    },
+  });
+
+  res.status(204).json({ message: 'done' });
 });
 
 // exports.approveInvitaion = catchAsync(async (req, res, nex) => {

@@ -5,12 +5,15 @@ const EventsController = require('../controllers/eventsController');
 const ImagesController = require('../controllers/ImagesController');
 const uuid = require('uuid');
 
+const imageDestination = 'events';
+
 storage = multer.diskStorage({
-  destination: 'public/images',
+  destination: `public/images/${imageDestination}`,
   filename: (req, file, cb) => {
     // Assuming you have access to the generated ID (e.g., createdImage.id)
     const uniqueFileName = `${uuid.v4()}.${file.originalname.split('.')[1]}`;
     req.imageFileName = uniqueFileName;
+    req.imageDestination = imageDestination;
     cb(null, uniqueFileName);
   },
 });

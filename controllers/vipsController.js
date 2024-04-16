@@ -1,9 +1,8 @@
 const catchAsync = require('../utils/catchAsync');
-const { Vips, Users, VipRequest } = require('../models');
+const { Vips, Users, VipRequest, Invitations, Bills } = require('../models');
 const Pagination = require('../utils/Pagination');
 const AppError = require('../utils/appError');
 const jwt = require('jsonwebtoken');
-const getPaginatedResults = require('../utils/Pagination');
 
 exports.getaccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -12,7 +11,7 @@ exports.getaccessToken = (id) => {
 };
 
 exports.getAllVips = catchAsync(async (req, res, next) => {
-  const { List, pagination } = await getPaginatedResults(req, Vips);
+  const { List, pagination } = await Pagination.getPaginatedResults(req, Vips);
   const allVipRequests = await VipRequest.findAll();
 
   res
@@ -52,6 +51,18 @@ exports.createVip = catchAsync(async (req, res, next) => {
 
 exports.deleteVip = catchAsync(async (req, res, next) => {
   const vipIds = req.body;
+
+  // Delete invitations associated with the vips
+  await Invitations.destroy({
+    where: { vipId: vipIds },
+  });
+
+  await Bills.destroy({
+    where: {
+      vipId: vipIds,
+    },
+  });
+
   // Delete users based on the provided array of user IDs
   const deletedVips = await Vips.destroy({
     where: { id: vipIds },

@@ -9,8 +9,8 @@ exports.createImage = catchAsync(async (req, res, next) => {
   }
 
   const imageUrl = `${req.protocol}://${req.get('host')}/images/${
-    req?.imageFileName
-  }`;
+    req.imageDestination
+  }/${req?.imageFileName}`;
 
   const createdImage = await Images.create({
     imageUrl: imageUrl, // Fix the attribute name here
@@ -37,14 +37,6 @@ exports.deleteImage = async (id) => {
   await Images.destroy({ where: { id: id } });
   this.unLinkImage(targetImage.imagename);
 
-  // const filePath = path.join(
-  //   __dirname,
-  //   '../public/images',
-  //   targetImage.imagename
-  // );
-
-  // fs.unlinkSync(filePath);
-
   return;
 };
 
@@ -55,14 +47,6 @@ exports.deleteQr = async (id) => {
 
   await QrCodes.destroy({ where: { id: id } });
   this.unLinkImage(`${targetQr.invitationId}.png`);
-
-  // const filePath = path.join(
-  //   __dirname,
-  //   '../public/images',
-  //   targetImage.imagename
-  // );
-
-  // fs.unlinkSync(filePath);
 
   return;
 };

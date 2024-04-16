@@ -16,7 +16,7 @@ class Pagination {
   }
 }
 
-const getPaginatedResults = async (req, model) => {
+getPaginatedResults = async (req, model) => {
   try {
     const PaginationInstance = new Pagination(
       parseInt(req.query.pageIndex) || 1,
@@ -41,4 +41,5 @@ const getPaginatedResults = async (req, model) => {
   }
 };
 
-module.exports = getPaginatedResults;
+module.exports = { Pagination, getPaginatedResults };
+// module.exports = Pagination;

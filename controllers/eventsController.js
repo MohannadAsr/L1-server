@@ -1,5 +1,5 @@
 const catchAsync = require('../utils/catchAsync');
-const { Events, Vips, Invitations, Products } = require('../models');
+const { Events, Vips, Invitations, Products, Tables } = require('../models');
 const { deleteImage, deleteQr } = require('./ImagesController');
 const { Op } = require('sequelize');
 const AppError = require('../utils/appError');
@@ -18,31 +18,45 @@ exports.getEvents = catchAsync(async (req, res, next) => {
   const allEvents = await Events.findAll({
     order: [['date', 'ASC']],
   });
-  const allInvitaions = await Promise.all(
-    allEvents.map(async (item) => {
-      const total = await Invitations.count({
-        where: {
-          status: 'pending',
-          eventId: item.id,
-        },
-      });
-      return total;
-    })
-  );
 
-  res
-    .status(200)
-    .json({ message: 'success', data: allEvents, pending: allInvitaions });
+  res.status(200).json({ message: 'success', data: allEvents });
 });
 
 exports.getEventByID = catchAsync(async (req, res, next) => {
   const event = await Events.findByPk(req.params.id);
 
+  const AllTablesDetails = await Tables.findAll({
+    where: { id: event.tableIds },
+  });
+
   if (!event) {
     return next(new AppError('Cannot Find this Event', 404));
   }
 
-  res.status(200).json({ message: 'success', data: event });
+  const InvitationHaveTables = await Invitations.findAll({
+    where: {
+      eventId: event.id,
+      tableId: {
+        [Op.in]: event.tableIds, // Use [Op.in] instead of [Op.contains]
+      },
+    },
+    attributes: ['tableId'],
+  });
+
+  const AllTables = InvitationHaveTables.map((item) => item.tableId);
+
+  const AvailableTables = event.tableIds.filter(
+    (item) => !AllTables.includes(item)
+  );
+
+  res.status(200).json({
+    message: 'success',
+    data: {
+      event,
+      AvailableTables,
+      AllTablesDetails,
+    },
+  });
 });
 
 exports.deleteEvent = catchAsync(async (req, res, next) => {
