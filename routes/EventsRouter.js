@@ -4,6 +4,8 @@ const multer = require('multer'); // For handling file uploads
 const EventsController = require('../controllers/eventsController');
 const ImagesController = require('../controllers/ImagesController');
 const uuid = require('uuid');
+const axios = require('axios');
+const fs = require('fs');
 
 const imageDestination = 'events';
 
