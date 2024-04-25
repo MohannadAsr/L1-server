@@ -40,8 +40,12 @@ router
         // Get the file data
         const fileData = req.file.buffer;
 
+        console.log(req.file);
+
         // Get FS Bucket URL from environment variables
         const fsBucketUrl = process.env.CC_FS_BUCKET;
+
+        console.log(fsBucketUrl);
 
         if (!fsBucketUrl) {
           throw new Error('FS Bucket URL is not provided');
