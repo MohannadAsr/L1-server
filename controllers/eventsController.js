@@ -26,13 +26,13 @@ exports.getEvents = catchAsync(async (req, res, next) => {
 exports.getEventByID = catchAsync(async (req, res, next) => {
   const event = await Events.findByPk(req.params.id);
 
-  const AllTablesDetails = await Tables.findAll({
-    where: { id: event.tableIds },
-  });
-
   if (!event) {
     return next(new AppError('Cannot Find this Event', 404));
   }
+
+  const AllTablesDetails = await Tables.findAll({
+    where: { id: event.tableIds },
+  });
 
   const InvitationHaveTables = await Invitations.findAll({
     where: {
