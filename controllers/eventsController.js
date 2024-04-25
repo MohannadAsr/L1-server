@@ -3,6 +3,7 @@ const { Events, Vips, Invitations, Products, Tables } = require('../models');
 const { deleteImage, deleteQr } = require('./ImagesController');
 const { Op } = require('sequelize');
 const AppError = require('../utils/appError');
+const cloudinary = require('../utils/cloudinary');
 
 exports.createEvent = catchAsync(async (req, res, next) => {
   const createdEvent = await Events.create({
@@ -74,7 +75,7 @@ exports.deleteEvent = catchAsync(async (req, res, next) => {
     await Promise.all(
       allRelatedInvitatinos?.map(async (item) => {
         if (item.qrCodeId) {
-          await deleteQr(item.qrCodeId);
+          await cloudinary.uploader.destroy(item.qrCodeId);
         }
       })
     );
