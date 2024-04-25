@@ -17,45 +17,79 @@ const qr = require('qrcode');
 const WhereClauseFilter = require('../utils/WhereClauseFilter');
 const { Pagination } = require('../utils/Pagination');
 const { Op } = require('sequelize');
+const cloudinary = require('../utils/cloudinary');
 
+// Local CreateQrCode
+// exports.createQrCode = async (req, newInvitation) => {
+//   try {
+//     // Generating the Qr Code
+
+//     // Url for database to use it
+//     const url = `${req.protocol}://${req.get('host')}/images/${
+//       newInvitation.id
+//     }.png`;
+
+//     // Create New Qr for This Invitation
+//     const newQrCode = await QrCodes.create({
+//       qrUrl: url,
+//       invitationId: newInvitation.id,
+//     });
+
+//     // set the Qr Url that send me to qrInvitationPage
+//     const urlScan = `${newInvitation.id}`;
+
+//     // Generate QR code as a data URL
+//     const qrCodeDataURL = await qr.toDataURL(urlScan, {
+//       width: 500,
+//       height: 500,
+//     });
+
+//     // Create a buffer from the data URL
+//     const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
+
+//     // Create a sharp object from the buffer
+//     const sharpImage = sharp(qrCodeBuffer);
+
+//     // Save the image to a file (e.g., public/images/qrcode.png)
+//     const imagePath = `public/images/${newInvitation.id}.png`;
+
+//     await sharpImage.toFile(imagePath);
+
+//     return { newQrCode, url };
+//   } catch (error) {
+//     throw new AppError('Cannot Create Qr Code', 400);
+//   }
+// };
+
+// Deployment Create Qr Code
 exports.createQrCode = async (req, newInvitation) => {
   try {
-    // Generating the Qr Code
-
-    // Url for database to use it
-    const url = `${req.protocol}://${req.get('host')}/images/${
-      newInvitation.id
-    }.png`;
-
-    // Create New Qr for This Invitation
-    const newQrCode = await QrCodes.create({
-      qrUrl: url,
-      invitationId: newInvitation.id,
-    });
-
-    // set the Qr Url that send me to qrInvitationPage
+    // set the Qr Url that sends me to qrInvitationPage
     const urlScan = `${newInvitation.id}`;
 
     // Generate QR code as a data URL
     const qrCodeDataURL = await qr.toDataURL(urlScan, {
-      width: 500,
-      height: 500,
+      width: 250,
+      height: 250,
     });
 
-    // Create a buffer from the data URL
-    const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
+    // Upload buffer to Cloudinary
+    const result = await cloudinary.uploader.upload(qrCodeDataURL, {
+      folder: 'qrCodes',
+    });
 
-    // Create a sharp object from the buffer
-    const sharpImage = sharp(qrCodeBuffer);
+    const url = result.secure_url;
 
-    // Save the image to a file (e.g., public/images/qrcode.png)
-    const imagePath = `public/images/${newInvitation.id}.png`;
-
-    await sharpImage.toFile(imagePath);
+    // Create New Qr for This Invitation
+    const newQrCode = await QrCodes.create({
+      id: result.public_id,
+      qrUrl: url,
+      invitationId: newInvitation.id,
+    });
 
     return { newQrCode, url };
   } catch (error) {
-    throw new AppError('Cannot Create Qr Code', 400);
+    throw error;
   }
 };
 
@@ -387,6 +421,11 @@ exports.updateInvitationStatus = catchAsync(async (req, res, next) => {
 exports.deleteInvitation = catchAsync(async (req, res, next) => {
   const { id } = req.query;
 
+  const targetInvitaion = await Invitations.findOne({ where: { id: id } });
+  if (targetInvitaion.qrCodeId) {
+    await cloudinary.uploader.destroy(targetInvitaion.qrCodeId);
+  }
+
   await Invitations.destroy({
     where: {
       id: id,
@@ -396,70 +435,3 @@ exports.deleteInvitation = catchAsync(async (req, res, next) => {
 
   res.status(204).json({ message: 'done' });
 });
-
-// exports.approveInvitaion = catchAsync(async (req, res, nex) => {
-//   const { id } = req.body;
-
-//   const targetInvitiation = await Invitations.findByPk(id);
-
-//   if (!targetInvitiation) {
-//     return next('Unable to Find this Invitation', 404);
-//   }
-
-//   // Url for database to use it
-//   const url = `${req.protocol}://${req.get('host')}/images/${req?.body.id}.png`;
-
-//   // Create New Qr for This Invitation
-//   const newQrCode = await QrCodes.create({
-//     qrUrl: url,
-//     invitationId: id,
-//   });
-
-//   // set the Qr Url that send me to qrInvitationPage
-//   const urlScan = `${id}`;
-
-//   // Generate QR code as a data URL
-//   const qrCodeDataURL = await qr.toDataURL(urlScan, {
-//     width: 500,
-//     height: 500,
-//   });
-
-//   // Create a buffer from the data URL
-//   const qrCodeBuffer = Buffer.from(qrCodeDataURL.split(',')[1], 'base64');
-
-//   // Create a sharp object from the buffer
-//   const sharpImage = sharp(qrCodeBuffer);
-
-//   // Save the image to a file (e.g., public/images/qrcode.png)
-//   const imagePath = `public/images/${id}.png`;
-
-//   await sharpImage.toFile(imagePath);
-
-//   const updatedInvitation = await Invitations.update(
-//     { status: 'approved', qrCodeId: newQrCode.id, qrCodeUrl: url },
-//     {
-//       where: { id: id },
-//       returning: true, // This ensures that the updated record is returned
-//     }
-//   );
-
-//   res
-//     .status(200)
-//     .json({ message: 'done', updatedInvite: updatedInvitation[1][0] });
-// });
-
-// exports.rejectInvitaion = catchAsync(async (req, res, next) => {
-//   const { id } = req.body;
-
-//   const updatedInvitation = await Invitations.update(
-//     { status: 'rejected' },
-//     {
-//       where: { id: id },
-//       returning: true, // This ensures that the updated record is returned
-//     }
-//   );
-
-//   res
-//     .status(200)
-//     .json({ message: 'done', updatedInvite: updatedInvitation[1][0] });
-// });

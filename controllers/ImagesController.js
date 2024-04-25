@@ -2,18 +2,26 @@ const catchAsync = require('../utils/catchAsync');
 const { Images, QrCodes } = require('../models');
 const path = require('path');
 const fs = require('fs');
+const cloudinary = require('../utils/cloudinary');
 
 exports.createImage = catchAsync(async (req, res, next) => {
   if (!req.file) {
     return next();
   }
+  console.log(req.file.path);
+  // Upload image to Cloudinary
+  const result = await cloudinary.uploader.upload(req.file.path, {
+    folder: 'events',
+  });
 
-  const imageUrl = `${req.protocol}://${req.get('host')}/images/${
-    req.imageDestination
-  }/${req?.imageFileName}`;
+  // For Development only
+  // const imageUrl = `${req.protocol}://${req.get('host')}/images/${
+  //   req.imageDestination
+  // }/${req?.imageFileName}`;
 
   const createdImage = await Images.create({
-    imageUrl: imageUrl, // Fix the attribute name here
+    id: result.public_id,
+    imageUrl: result.secure_url, // Fix the attribute name here
     imagename: req.imageFileName,
   });
 
@@ -34,9 +42,9 @@ exports.deleteImage = async (id) => {
 
   if (!targetImage) return;
 
+  await cloudinary.uploader.destroy(id);
   await Images.destroy({ where: { id: id } });
   this.unLinkImage(targetImage.imagename);
-
   return;
 };
 
