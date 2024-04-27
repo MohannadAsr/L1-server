@@ -86,10 +86,5 @@ exports.getBillsStats = catchAsync(async (req, res, next) => {
     raw: true,
   });
 
-  // const amountTotals = BillsStats.map((billStat) => ({
-  //   amount: billStat.billDetails?.amount_total,
-  //   date: billStat.dataValues.month,
-  // }));
-
-  res.status(200).json({ data: BillsStats });
+  res.status(200).json({ year: currentYear, Bills: BillsStats });
 });

@@ -34,3 +34,18 @@ exports.getAllBills = catchAsync(async (req, res, next) => {
     pagination,
   });
 });
+
+exports.deleteBills = catchAsync(async (req, res, next) => {
+  const vipIds = req.body;
+
+  // Delete users based on the provided array of user IDs
+  const deletedVips = await Bills.destroy({
+    where: { id: vipIds },
+  });
+
+  if (deletedVips > 0) {
+    return res.status(200).json({ message: 'Vips deleted successfully' });
+  } else {
+    next(new AppError('No Vips found with the provided IDs', 404));
+  }
+});
