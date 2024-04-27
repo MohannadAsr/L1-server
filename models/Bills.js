@@ -34,21 +34,9 @@ module.exports = (sequelize) => {
         defaultValue: new Date(),
         allowNull: true,
       },
-      billDetails: {
-        type: DataTypes.JSON,
+      amount: {
+        type: DataTypes.BIGINT,
         allowNull: false,
-        get() {
-          // Parse the stored JSON string when fetching the value
-          const rawValue = this.getDataValue('billDetails');
-          return rawValue ? JSON.parse(rawValue) : null;
-        },
-        set(value) {
-          // Stringify the JSON object when setting the value
-          this.setDataValue(
-            'billDetails',
-            value ? JSON.stringify(value) : null
-          );
-        },
       },
       deletedAt: {
         type: DataTypes.DATE,

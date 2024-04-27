@@ -16,8 +16,9 @@ const sharp = require('sharp');
 const qr = require('qrcode');
 const WhereClauseFilter = require('../utils/WhereClauseFilter');
 const { Pagination } = require('../utils/Pagination');
-const { Op } = require('sequelize');
+const { Op, sequelize } = require('sequelize');
 const cloudinary = require('../utils/cloudinary');
+const { Sequelize, Transaction } = require('sequelize');
 
 // Local CreateQrCode
 // exports.createQrCode = async (req, newInvitation) => {
@@ -168,7 +169,13 @@ exports.createInvitaion = catchAsync(async (req, res, next) => {
   }
 
   if (req.body.tableReservation == true) {
-    if (checkEvent.tablesCount - 1 < 0) {
+    const duplicatedTable = await Invitations.findOne({
+      where: {
+        tableId: req.body.tableId,
+        eventId: req.body.eventId,
+      },
+    });
+    if (duplicatedTable) {
       return next(new AppError('Sorry No Tables Available', 400));
     }
   }
@@ -270,7 +277,7 @@ exports.stripeWebHook = async (req, res) => {
           eventId: newInvitation.eventId,
           vipId: newInvitation.vipId,
           date: new Date(),
-          billDetails: sessionComplete,
+          billDetails: sessionComplete.amount_total / 100,
         });
         await Invitations.update(
           {
@@ -434,4 +441,66 @@ exports.deleteInvitation = catchAsync(async (req, res, next) => {
   });
 
   res.status(204).json({ message: 'done' });
+});
+
+exports.updateInvitation = catchAsync(async (req, res, next) => {
+  if (req.body.tableReservation == true) {
+    const duplicatedTable = await Invitations.findOne({
+      where: {
+        tableId: req.body.tableId,
+        eventId: req.body.eventId,
+      },
+    });
+    if (duplicatedTable && req.body.id !== duplicatedTable?.id) {
+      return next(
+        new AppError(
+          `Sorry No Tables Available ${duplicatedTable?.id}, ${req.body.id} `,
+          400
+        )
+      );
+    }
+  }
+
+  updatedInvite = await Invitations.update(req.body, {
+    where: {
+      id: req.body.id,
+    },
+  });
+
+  // Check if any rows were affected (updated)
+  if (updatedInvite[0] === 0) {
+    return res
+      .status(404)
+      .json({ message: 'Invitation not found or not updated.' });
+  }
+
+  res.status(200).json({ message: 'success', data: updatedInvite });
+});
+
+// Update Invitation to Missed IF the Event start time is less than current time and 5 hours ago
+exports.ScanEventsAndUpdateInvitations = catchAsync(async (req, res, next) => {
+  const currentDate = new Date();
+  const fiveHoursAgo = new Date(currentDate.getTime() - 5 * 60 * 60 * 1000); // Subtract 5 hours in milliseconds
+
+  const pastEvents = await Events.findAll({
+    where: {
+      date: {
+        [Op.lt]: fiveHoursAgo, // Use 'lt' (less than) operator
+      },
+    },
+  });
+
+  const updatePromises = pastEvents.map(async (event) => {
+    try {
+      await Invitations.update(
+        { status: 'missed' }, // Set status to 'missed'
+        { where: { eventId: event.id, status: { [Op.ne]: 'completed' } } }
+      );
+    } catch (error) {
+      console.error(`Error updating invitations for event ${event.id}:`, error);
+      // Handle individual update errors (optional, e.g., logging or retrying)
+    }
+  });
+
+  await Promise.all(updatePromises);
 });

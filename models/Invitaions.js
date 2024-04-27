@@ -47,7 +47,8 @@ module.exports = (sequelize) => {
       },
       peopleNames: {
         type: DataTypes.JSON, // Defines an array of integers
-        allowNull: true,
+        allowNull: false,
+        defaultValue: '[]',
         get() {
           // Parse the stored JSON string when fetching the value
           const rawValue = this.getDataValue('peopleNames');
@@ -91,6 +92,10 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
       deliveryAddress: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      comment: {
         type: DataTypes.TEXT,
         allowNull: true,
       },

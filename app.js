@@ -3,6 +3,13 @@ const multer = require('multer'); // For handling file uploads
 const stripe = require('stripe')(process.env.STRIPE_SK);
 
 const InvitaionsController = require('./controllers/InvitationsController');
+const cron = require('node-cron');
+
+// Scheduling A task for Events Invitations Sets to missed
+const schedule = cron.schedule(
+  '0 0,12 * * *',
+  InvitaionsController.ScanEventsAndUpdateInvitations
+); // Every day at midnight
 
 // importing the routers for each route
 
@@ -23,36 +30,6 @@ app.post(
   '/webhook',
   express.raw({ type: 'application/json' }),
   InvitaionsController.stripeWebHook
-  // (request, response) => {
-  //   const sig = request.headers['stripe-signature'];
-
-  //   let event;
-
-  //   try {
-  //     event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
-  //   } catch (err) {
-  //     response.status(400).send(`Webhook Error: ${err.message}`);
-  //     return;
-  //   }
-
-  //   // Handle the event
-  //   switch (event.type) {
-  //     case 'checkout.session.completed':
-  //       const sessionComplete = event.data.object;
-  //       console.log(sessionComplete);
-  //       // Then define and call a function to handle the event payment_intent.succeeded
-  //       break;
-  //     case 'checkout.session.expired':
-  //       const session = event.data.object;
-  //       // Perform actions when a session expires
-  //       console.log('Session expired:', session);
-  //       // Your custom logic here
-  //       break;
-  //     // ... handle other event types
-  //     default:
-  //       console.log(`Unhandled event type ${event.type}`);
-  //   }
-  // }
 );
 
 app.use('/images', express.static('public/images'));

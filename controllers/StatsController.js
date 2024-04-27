@@ -64,3 +64,32 @@ exports.getGeneralStats = catchAsync(async (req, res, next) => {
     vips: VipsStats,
   });
 });
+
+exports.getBillsStats = catchAsync(async (req, res, next) => {
+  const { currentYear } = req.query;
+
+  const BillsStats = await Bills.findAll({
+    attributes: [
+      [fn('date_format', col('date'), '%m'), 'month'],
+      [fn('sum', col('amount')), 'totalAmount'],
+    ],
+    where: {
+      date: {
+        [Op.between]: [
+          `${currentYear || new Date().getFullYear()}-01-01`,
+          `${currentYear || new Date().getFullYear()}-12-31`,
+        ],
+      },
+    },
+    group: [fn('date_format', col('date'), '%m')],
+    paranoid: false,
+    raw: true,
+  });
+
+  // const amountTotals = BillsStats.map((billStat) => ({
+  //   amount: billStat.billDetails?.amount_total,
+  //   date: billStat.dataValues.month,
+  // }));
+
+  res.status(200).json({ data: BillsStats });
+});

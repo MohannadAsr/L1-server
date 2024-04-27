@@ -9,9 +9,11 @@ router
   .post(InvitaionsController.createInvitaion)
   .delete(InvitaionsController.deleteInvitation);
 
+//test
+router.route('/sss').get(InvitaionsController.ScanEventsAndUpdateInvitations);
+
 router.route('/updateStatus').post(InvitaionsController.updateInvitationStatus);
-// router.route('/aprroveInvitation').post(InvitaionsController.approveInvitaion);
-// router.route('/rejectInvitation').post(InvitaionsController.rejectInvitaion);
+router.route('/update').post(InvitaionsController.updateInvitation);
 router
   .route('/invitationForVip')
   .get(InvitaionsController.getInvitaionByEventandUserIds);
