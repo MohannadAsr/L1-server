@@ -123,6 +123,8 @@ exports.createStripeSession = async (
   additionalData
 ) => {
   try {
+    const VipClientWebApp = 'https://l1-vip-client.vercel.app';
+
     // Create a Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -140,8 +142,8 @@ exports.createStripeSession = async (
         };
       }),
       mode: 'payment',
-      success_url: `https://qr-test-iw1o.vercel.app/eventaccess/${checkEvent.id}`,
-      cancel_url: `https://qr-test-iw1o.vercel.app/eventaccess/${checkEvent.id}`,
+      success_url: `${VipClientWebApp}/${checkEvent.id}`,
+      cancel_url: `${VipClientWebApp}/${checkEvent.id}`,
       metadata: additionalData, // Incl
     });
 
