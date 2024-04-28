@@ -277,7 +277,7 @@ exports.stripeWebHook = async (req, res) => {
           eventId: newInvitation.eventId,
           vipId: newInvitation.vipId,
           date: new Date(),
-          billDetails: sessionComplete.amount_total / 100,
+          amount: sessionComplete.amount_total / 100,
         });
         await Invitations.update(
           {
