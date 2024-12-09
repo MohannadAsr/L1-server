@@ -101,7 +101,13 @@ exports.vipLogin = catchAsync(async (req, res, next) => {
 
   // Check if the code is provided
   if (!email && !phone) {
-    return next(new AppError('Please Provide email or  phone Number', 400));
+    // Please Provide email or  phone Number
+    return next(
+      new AppError(
+        'Bitte geben Sie Ihre E-Mail-Adresse oder Telefonnummer an.',
+        400
+      )
+    );
   }
 
   let user;
@@ -117,7 +123,10 @@ exports.vipLogin = catchAsync(async (req, res, next) => {
   }
 
   if (!user) {
-    return next(new AppError('Incorrect email or phone number', 404));
+    // Incorrect email or phone number
+    return next(
+      new AppError('Falsche E-Mail-Adresse oder Telefonnummer.', 404)
+    );
   }
 
   // Generate and send the JWT token
